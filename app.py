@@ -9,7 +9,7 @@ def get_connection():
 # CONFIGURACIÓN DE PÁGINA
 st.set_page_config(page_title="Inventario Orbe Verde", layout="wide")
 
-# ESTILO OSCURO Y CAMPOS BLANCOS
+# ESTILO OSCURO + INPUTS BLANCOS
 st.markdown("""
     <style>
     body { background-color: #0e1117; color: white; }
@@ -26,7 +26,7 @@ st.markdown("""
 # TÍTULO
 st.title("🍽️ Sistema de Inventario - Restaurante Orbe Verde")
 
-# TABS
+# PESTAÑAS
 tabs = st.tabs(["🧑‍🍳 Cocina", "🍻 Bar", "👨‍💼 Administrador"])
 
 # ========== 🧑‍🍳 PESTAÑA COCINA ==========
@@ -36,7 +36,7 @@ with tabs[0]:
     conn = get_connection()
     cursor = conn.cursor()
 
-    # Obtener productos de cocina organizados
+    # Productos organizados por categoría y subcategoría
     productos = pd.read_sql_query("""
         SELECT id, nombre, categoria, subcategoria, unidad
         FROM productos
@@ -46,7 +46,6 @@ with tabs[0]:
 
     solicitado_por = st.text_input("Solicitado por")
 
-    # Agrupar por categoría
     categorias = productos["categoria"].unique()
     cantidades = {}
 
@@ -63,8 +62,8 @@ with tabs[0]:
                 if cantidad > 0:
                     cantidades[row["id"]] = cantidad
 
-    # Botón para enviar múltiples productos
-    if st.button("Enviar solicitud"):
+    # ✅ Botón con nombre simple y clave única
+    if st.button("Enviar solicitud", key="enviar_cocina"):
         if solicitado_por and len(cantidades) > 0:
             for prod_id, cant in cantidades.items():
                 cursor.execute("""
@@ -116,7 +115,8 @@ with tabs[1]:
                 if cantidad > 0:
                     cantidades_bar[row["id"]] = cantidad
 
-    if st.button("Enviar solicitud"):
+    # ✅ Botón con nombre único y clave única
+    if st.button("Enviar solicitud", key="enviar_bar"):
         if solicitado_por_bar and len(cantidades_bar) > 0:
             for prod_id, cant in cantidades_bar.items():
                 cursor.execute("""
@@ -175,7 +175,7 @@ with tabs[2]:
                 conn.commit()
                 st.rerun()
 
-    if st.button("🧹 Limpiar solicitudes compradas (cocina)"):
+    if st.button("Enviar solicitud", key="limpiar_cocina"):
         cursor.execute("""
             DELETE FROM solicitudes
             WHERE estado = 'comprado' AND producto_id IN (
@@ -183,7 +183,7 @@ with tabs[2]:
             )
         """)
         conn.commit()
-        st.success("🧼 Solicitudes de cocina eliminadas.")
+        st.success("🧼 Solicitudes compradas de cocina eliminadas.")
         st.rerun()
 
     st.divider()
@@ -218,7 +218,7 @@ with tabs[2]:
                 conn.commit()
                 st.rerun()
 
-    if st.button("🧹 Limpiar solicitudes compradas (bar)"):
+    if st.button("Enviar solicitud", key="limpiar_bar"):
         cursor.execute("""
             DELETE FROM solicitudes
             WHERE estado = 'comprado' AND producto_id IN (
@@ -226,7 +226,6 @@ with tabs[2]:
             )
         """)
         conn.commit()
-        st.success("🧼 Solicitudes del bar eliminadas.")
+        st.success("🧼 Solicitudes compradas del bar eliminadas.")
         st.rerun()
-
 
