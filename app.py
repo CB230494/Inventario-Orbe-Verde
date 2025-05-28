@@ -1,69 +1,95 @@
 import streamlit as st
 import sqlite3
 import pandas as pd
+from datetime import datetime
 
-# Conectar a la base de datos
-def get_connection():
-    return sqlite3.connect("inventario_orbeverde.db", check_same_thread=False)
-
-# Configuración general de la app
+# Configuración general
 st.set_page_config(page_title="Inventario Orbe Verde", layout="wide")
-
-# Estilo oscuro con entradas blancas
-st.markdown("""
+st.markdown(
+    """
     <style>
-    body { background-color: #0e1117; color: white; }
-    .main { color: white; }
-    .stApp { background-color: #0e1117; }
-    h1, h2, h3, .st-bb { color: #00ff88; }
-    input, select, textarea {
-        background-color: #1a1d26 !important;
-        color: white !important;
-    }
+    body { color: white; background-color: #121212; }
+    .stTextInput > div > div > input { color: white !important; }
+    .stNumberInput input { color: white !important; }
+    .stDataFrame div { color: white !important; }
     </style>
-""", unsafe_allow_html=True)
+    """, unsafe_allow_html=True
+)
 
-# Título principal
-st.title("🍽️ Sistema de Inventario - Restaurante Orbe Verde")
+# Conexión base de datos
+conn = sqlite3.connect("inventario_orbeverde.db")
+cursor = conn.cursor()
 
-# Crear pestañas
-tabs = st.tabs(["🧑‍🍳 Cocina", "🍻 Bar", "👨‍💼 Administrador"])
+# Crear tabla productos si no existe
+cursor.execute("""
+CREATE TABLE IF NOT EXISTS productos (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    nombre TEXT NOT NULL,
+    categoria TEXT,
+    subcategoria TEXT,
+    unidad TEXT,
+    tipo TEXT,
+    marca TEXT,
+    origen TEXT CHECK(origen IN ('cocina', 'bar')) NOT NULL
+)
+""")
+
+# Crear tabla solicitudes
+cursor.execute("""
+CREATE TABLE IF NOT EXISTS solicitudes (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    producto_id INTEGER NOT NULL,
+    cantidad TEXT NOT NULL,
+    solicitado_por TEXT NOT NULL,
+    estado TEXT DEFAULT 'pendiente',
+    fecha DATETIME DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (producto_id) REFERENCES productos(id)
+)
+""")
+conn.commit()
+
+# Tabs
+tabs = st.tabs(["🍽 Cocina", "🍸 Bar", "🧾 Administrador"])
 
 # ========== 🧑‍🍳 PESTAÑA COCINA ==========
 with tabs[0]:
     st.subheader("Solicitud de productos desde cocina")
 
-    conn = get_connection()
-    cursor = conn.cursor()
+    # CORREGIR unidad del arroz a kilo (en ejecución directa para evitar errores)
+    cursor.execute("""
+        UPDATE productos
+        SET unidad = 'kilo'
+        WHERE LOWER(nombre) = 'arroz' AND origen = 'cocina'
+    """)
+    conn.commit()
 
-    # Cargar productos de cocina
-    productos = pd.read_sql_query("""
+    # Cargar productos
+    productos_cocina = pd.read_sql_query("""
         SELECT id, nombre, categoria, subcategoria, unidad
         FROM productos
         WHERE origen = 'cocina'
         ORDER BY categoria, subcategoria, nombre
     """, conn)
 
-    solicitado_por = st.text_input("Solicitado por")
+    solicitado_por = st.text_input("Solicitado por", key="solicitado_cocina")
 
-    categorias = productos["categoria"].unique()
+    categorias = productos_cocina["categoria"].unique()
     cantidades = {}
 
-    # Mostrar productos por categoría
-    for categoria in categorias:
-        with st.expander(f"🗂️ {categoria}", expanded=False):
-            subset = productos[productos["categoria"] == categoria]
-            for _, row in subset.iterrows():
-                label = row["nombre"]
-                if row["subcategoria"]:
-                    label += f" ({row['subcategoria']})"
-                label += f" - {row['unidad']}"
-                key = f"cocina_{row['id']}"
-                cantidad = st.number_input(f"{label}", min_value=0, step=1, key=key)
-                if cantidad > 0:
-                    cantidades[row["id"]] = cantidad
+    for cat in categorias:
+        with st.expander(f"🍽 {cat}", expanded=False):
+            subcategorias = productos_cocina[productos_cocina["categoria"] == cat]["subcategoria"].unique()
+            for sub in subcategorias:
+                st.markdown(f"**{sub}**")
+                sub_df = productos_cocina[(productos_cocina["categoria"] == cat) & (productos_cocina["subcategoria"] == sub)]
+                for _, row in sub_df.iterrows():
+                    label = f"{row['nombre']} ({row['unidad']})"
+                    key = f"cocina_{row['id']}"
+                    cantidad = st.number_input(label, min_value=0, step=1, key=key)
+                    if cantidad > 0:
+                        cantidades[row["id"]] = cantidad
 
-    # Botón para enviar solicitud
+    # Botón de envío
     if st.button("Enviar solicitud", key="enviar_cocina"):
         if solicitado_por and len(cantidades) > 0:
             for prod_id, cant in cantidades.items():
@@ -78,10 +104,10 @@ with tabs[0]:
             st.warning("⚠️ Asegúrese de escribir su nombre y marcar al menos un producto con cantidad.")
 
     st.divider()
-    st.markdown("### Solicitudes recientes")
+    st.markdown("### Solicitudes recientes de cocina")
 
-    # Mostrar solicitudes de cocina en formato mejorado
-    solicitudes = pd.read_sql_query("""
+    # Mostrar solicitudes formateadas
+    solicitudes_cocina = pd.read_sql_query("""
         SELECT s.id, s.producto_id, s.cantidad, s.estado, s.fecha, s.solicitado_por,
                p.nombre, p.unidad
         FROM solicitudes s
@@ -90,54 +116,56 @@ with tabs[0]:
         ORDER BY s.fecha DESC
     """, conn)
 
-    # Crear texto formateado
-    solicitudes["Producto solicitado"] = solicitudes.apply(
+    solicitudes_cocina["Producto solicitado"] = solicitudes_cocina.apply(
         lambda row: f"{row['cantidad']} {row['unidad']} de {row['nombre']}", axis=1
     )
 
-    mostrar = solicitudes[["Producto solicitado", "estado", "fecha", "solicitado_por"]]
+    mostrar = solicitudes_cocina[["Producto solicitado", "estado", "fecha", "solicitado_por"]]
     st.dataframe(mostrar.rename(columns={
         "estado": "Estado",
         "fecha": "Fecha",
         "solicitado_por": "Solicitado por"
     }), use_container_width=True)
-# ========== 🍻 PESTAÑA BAR ==========
+# ========== 🍸 PESTAÑA BAR ==========
 with tabs[1]:
     st.subheader("Solicitud de productos desde bar")
 
-    # Cargar productos del bar
+    # Cargar productos de bar
     productos_bar = pd.read_sql_query("""
-        SELECT id, nombre, tipo, marca, unidad
+        SELECT id, nombre, categoria, subcategoria, unidad, marca
         FROM productos
         WHERE origen = 'bar'
-        ORDER BY tipo, marca, nombre
+        ORDER BY categoria, subcategoria, nombre
     """, conn)
 
-    solicitado_por_bar = st.text_input("Solicitado por", key="solicitado_bar")
+    solicitado_por = st.text_input("Solicitado por", key="solicitado_bar")
 
-    tipos = productos_bar["tipo"].unique()
+    categorias_bar = productos_bar["categoria"].unique()
     cantidades_bar = {}
 
-    for tipo in tipos:
-        with st.expander(f"🍶 {tipo}", expanded=False):
-            subset = productos_bar[productos_bar["tipo"] == tipo]
-            for _, row in subset.iterrows():
-                label = f"{row['nombre']} - {row['marca']} ({row['unidad']})"
-                key = f"bar_{row['id']}"
-                cantidad = st.number_input(f"{label}", min_value=0, step=1, key=key)
-                if cantidad > 0:
-                    cantidades_bar[row["id"]] = cantidad
+    for cat in categorias_bar:
+        with st.expander(f"🍹 {cat}", expanded=False):
+            subcategorias = productos_bar[productos_bar["categoria"] == cat]["subcategoria"].unique()
+            for sub in subcategorias:
+                st.markdown(f"**{sub}**")
+                sub_df = productos_bar[(productos_bar["categoria"] == cat) & (productos_bar["subcategoria"] == sub)]
+                for _, row in sub_df.iterrows():
+                    label = f"{row['nombre']} ({row['marca']}) - {row['unidad']}"
+                    key = f"bar_{row['id']}"
+                    cantidad = st.number_input(label, min_value=0, step=1, key=key)
+                    if cantidad > 0:
+                        cantidades_bar[row["id"]] = cantidad
 
     # Botón de envío
     if st.button("Enviar solicitud", key="enviar_bar"):
-        if solicitado_por_bar and len(cantidades_bar) > 0:
+        if solicitado_por and len(cantidades_bar) > 0:
             for prod_id, cant in cantidades_bar.items():
                 cursor.execute("""
                     INSERT INTO solicitudes (producto_id, cantidad, solicitado_por)
                     VALUES (?, ?, ?)
-                """, (prod_id, str(cant), solicitado_por_bar))
+                """, (prod_id, str(cant), solicitado_por))
             conn.commit()
-            st.success("✅ Todas las solicitudes desde bar fueron registradas correctamente.")
+            st.success("✅ Todas las solicitudes del bar fueron registradas correctamente.")
             st.rerun()
         else:
             st.warning("⚠️ Asegúrese de escribir su nombre y marcar al menos un producto con cantidad.")
@@ -145,7 +173,6 @@ with tabs[1]:
     st.divider()
     st.markdown("### Solicitudes recientes del bar")
 
-    # Mostrar solicitudes formateadas
     solicitudes_bar = pd.read_sql_query("""
         SELECT s.id, s.producto_id, s.cantidad, s.estado, s.fecha, s.solicitado_por,
                p.nombre, p.unidad, p.marca
@@ -256,5 +283,6 @@ with tabs[2]:
         conn.commit()
         st.success("🧼 Solicitudes compradas del bar eliminadas.")
         st.rerun()
+
 
 
