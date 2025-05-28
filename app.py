@@ -1,32 +1,25 @@
 import streamlit as st
 import sqlite3
 import pandas as pd
-from datetime import datetime
 
 # CONEXIÓN BASE DE DATOS
 def get_connection():
     return sqlite3.connect("inventario_orbeverde.db", check_same_thread=False)
 
-# CONFIGURACIÓN GENERAL
+# CONFIGURACIÓN GENERAL DE PÁGINA
 st.set_page_config(page_title="Inventario Orbe Verde", layout="wide")
+
+# ESTILOS: NEGRO + VERDE INSTITUCIONAL + TEXTO BLANCO
 st.markdown("""
     <style>
-    body {
-        background-color: #0e1117;
-        color: white;
-    }
+    body { background-color: #0e1117; color: white; }
     .main { color: white; }
-    .stApp {
-        background-color: #0e1117;
-    }
-    h1, h2, h3 {
-        color: #00ff88;
-    }
+    .stApp { background-color: #0e1117; }
+    h1, h2, h3, .st-bb { color: #00ff88; }
     </style>
 """, unsafe_allow_html=True)
 
-# LOGO Y TÍTULO
-st.image("logo_orbeverde.png", width=150)  # Asegúrate que exista este archivo en tu carpeta
+# TÍTULO PRINCIPAL
 st.title("🍽️ Sistema de Inventario - Restaurante Orbe Verde")
 
 # PESTAÑAS
@@ -35,14 +28,19 @@ tabs = st.tabs(["🧑‍🍳 Cocina", "🍻 Bar", "👨‍💼 Administrador"])
 # ========== COCINA ==========
 with tabs[0]:
     st.subheader("Solicitud de productos desde cocina")
+    
     conn = get_connection()
     cursor = conn.cursor()
 
-    # Cargar productos de cocina
-    productos = pd.read_sql_query("SELECT id, nombre, unidad FROM productos WHERE origen = 'cocina'", conn)
+    # Cargar productos disponibles de cocina
+    productos = pd.read_sql_query(
+        "SELECT id, nombre, unidad FROM productos WHERE origen = 'cocina'",
+        conn
+    )
     productos["display"] = productos["nombre"] + " (" + productos["unidad"] + ")"
-    producto_select = st.selectbox("Seleccione un producto", productos["display"])
 
+    # Formulario de solicitud
+    producto_select = st.selectbox("Seleccione un producto", productos["display"])
     cantidad = st.text_input("Cantidad solicitada")
     solicitado_por = st.text_input("Solicitado por")
 
@@ -60,6 +58,7 @@ with tabs[0]:
 
     st.divider()
     st.markdown("### Solicitudes recientes")
+
     solicitudes = pd.read_sql_query("""
         SELECT s.id, p.nombre, s.cantidad, s.estado, s.fecha, s.solicitado_por
         FROM solicitudes s
@@ -67,6 +66,6 @@ with tabs[0]:
         WHERE p.origen = 'cocina'
         ORDER BY s.fecha DESC
     """, conn)
+
     st.dataframe(solicitudes, use_container_width=True)
 
-# A partir de aquí siguen las pestañas del BAR y ADMINISTRADOR...
