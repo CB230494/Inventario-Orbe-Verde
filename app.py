@@ -68,4 +68,40 @@ with tabs[0]:
     """, conn)
 
     st.dataframe(solicitudes, use_container_width=True)
+with tabs[1]:
+    st.subheader("Solicitud de productos desde bar")
+
+    # Cargar productos disponibles del bar
+    productos_bar = pd.read_sql_query(
+        "SELECT id, nombre, marca, unidad FROM productos WHERE origen = 'bar'",
+        conn
+    )
+    productos_bar["display"] = productos_bar["nombre"] + " - " + productos_bar["marca"] + " (" + productos_bar["unidad"] + ")"
+
+    producto_select_bar = st.selectbox("Seleccione un producto", productos_bar["display"])
+    cantidad_bar = st.text_input("Cantidad solicitada", key="cantidad_bar")
+    solicitado_por_bar = st.text_input("Solicitado por", key="solicitado_por_bar")
+
+    if st.button("Enviar solicitud desde bar"):
+        if cantidad_bar and solicitado_por_bar:
+            producto_id = int(productos_bar[productos_bar["display"] == producto_select_bar]["id"].values[0])
+            cursor.execute("""
+                INSERT INTO solicitudes (producto_id, cantidad, solicitado_por)
+                VALUES (?, ?, ?)
+            """, (producto_id, cantidad_bar, solicitado_por_bar))
+            conn.commit()
+            st.success("✅ Solicitud desde bar registrada.")
+        else:
+            st.warning("Por favor complete todos los campos.")
+
+    st.divider()
+    st.markdown("### Solicitudes recientes del bar")
+    solicitudes_bar = pd.read_sql_query("""
+        SELECT s.id, p.nombre, p.marca, s.cantidad, s.estado, s.fecha, s.solicitado_por
+        FROM solicitudes s
+        JOIN productos p ON s.producto_id = p.id
+        WHERE p.origen = 'bar'
+        ORDER BY s.fecha DESC
+    """, conn)
+    st.dataframe(solicitudes_bar, use_container_width=True)
 
