@@ -9,7 +9,7 @@ def get_connection():
 # CONFIGURACIÓN DE PÁGINA
 st.set_page_config(page_title="Inventario Orbe Verde", layout="wide")
 
-# ESTILO NEGRO, VERDE INSTITUCIONAL Y ENTRADAS BLANCAS
+# ESTILO OSCURO Y CAMPOS BLANCOS
 st.markdown("""
     <style>
     body { background-color: #0e1117; color: white; }
@@ -36,7 +36,7 @@ with tabs[0]:
     conn = get_connection()
     cursor = conn.cursor()
 
-    # Obtener productos de cocina
+    # Obtener productos de cocina organizados
     productos = pd.read_sql_query("""
         SELECT id, nombre, categoria, subcategoria, unidad
         FROM productos
@@ -44,35 +44,37 @@ with tabs[0]:
         ORDER BY categoria, subcategoria, nombre
     """, conn)
 
-    # Generar display ordenado por categoría y subcategoría
-    def formatear_fila(row):
-        cat = f"[{row['categoria']}]"
-        sub = f"({row['subcategoria']})" if row['subcategoria'] else ""
-        return f"{cat} {row['nombre']} {sub} - {row['unidad']}"
-
-    productos["display"] = productos.apply(formatear_fila, axis=1)
-
-    seleccionados = st.multiselect("Seleccione uno o más productos", productos["display"])
-
     solicitado_por = st.text_input("Solicitado por")
 
+    # Agrupar por categoría
+    categorias = productos["categoria"].unique()
     cantidades = {}
-    for item in seleccionados:
-        prod_id = int(productos[productos["display"] == item]["id"].values[0])
-        cantidades[prod_id] = st.text_input(f"Cantidad para {item}", key=f"cantidad_{prod_id}")
+
+    for categoria in categorias:
+        with st.expander(f"🗂️ {categoria}", expanded=False):
+            subset = productos[productos["categoria"] == categoria]
+            for _, row in subset.iterrows():
+                label = row["nombre"]
+                if row["subcategoria"]:
+                    label += f" ({row['subcategoria']})"
+                label += f" - {row['unidad']}"
+                key = f"cocina_{row['id']}"
+                cantidad = st.number_input(f"{label}", min_value=0.0, step=0.5, key=key)
+                if cantidad > 0:
+                    cantidades[row["id"]] = cantidad
 
     if st.button("Enviar solicitud múltiple"):
-        if solicitado_por and all(cantidades.values()):
+        if solicitado_por and len(cantidades) > 0:
             for prod_id, cant in cantidades.items():
                 cursor.execute("""
                     INSERT INTO solicitudes (producto_id, cantidad, solicitado_por)
                     VALUES (?, ?, ?)
-                """, (prod_id, cant, solicitado_por))
+                """, (prod_id, str(cant), solicitado_por))
             conn.commit()
             st.success("✅ Todas las solicitudes fueron registradas correctamente.")
             st.rerun()
         else:
-            st.warning("⚠️ Asegúrese de llenar todos los campos y cantidades antes de enviar.")
+            st.warning("⚠️ Asegúrese de escribir su nombre y marcar al menos un producto con cantidad.")
 
     st.divider()
     st.markdown("### Solicitudes recientes")
@@ -86,3 +88,4 @@ with tabs[0]:
     """, conn)
 
     st.dataframe(solicitudes, use_container_width=True)
+
