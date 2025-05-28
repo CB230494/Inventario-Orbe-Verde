@@ -59,10 +59,11 @@ with tabs[0]:
                     label += f" ({row['subcategoria']})"
                 label += f" - {row['unidad']}"
                 key = f"cocina_{row['id']}"
-                cantidad = st.number_input(f"{label}", min_value=0.0, step=0.5, key=key)
+                cantidad = st.number_input(f"{label}", min_value=0, step=1, key=key)
                 if cantidad > 0:
                     cantidades[row["id"]] = cantidad
 
+    # Botón para enviar múltiples productos
     if st.button("Enviar solicitud múltiple"):
         if solicitado_por and len(cantidades) > 0:
             for prod_id, cant in cantidades.items():
@@ -88,4 +89,5 @@ with tabs[0]:
     """, conn)
 
     st.dataframe(solicitudes, use_container_width=True)
+
 
