@@ -89,5 +89,57 @@ with tabs[0]:
     """, conn)
 
     st.dataframe(solicitudes, use_container_width=True)
+# ========== 🍻 PESTAÑA BAR ==========
+with tabs[1]:
+    st.subheader("Solicitud de productos desde bar")
+
+    # Cargar productos del bar
+    productos_bar = pd.read_sql_query("""
+        SELECT id, nombre, tipo, marca, unidad
+        FROM productos
+        WHERE origen = 'bar'
+        ORDER BY tipo, marca, nombre
+    """, conn)
+
+    solicitado_por_bar = st.text_input("Solicitado por", key="solicitado_bar")
+
+    tipos = productos_bar["tipo"].unique()
+    cantidades_bar = {}
+
+    for tipo in tipos:
+        with st.expander(f"🍶 {tipo}", expanded=False):
+            subset = productos_bar[productos_bar["tipo"] == tipo]
+            for _, row in subset.iterrows():
+                label = f"{row['nombre']} - {row['marca']} ({row['unidad']})"
+                key = f"bar_{row['id']}"
+                cantidad = st.number_input(f"{label}", min_value=0, step=1, key=key)
+                if cantidad > 0:
+                    cantidades_bar[row["id"]] = cantidad
+
+    if st.button("Enviar solicitud múltiple desde bar"):
+        if solicitado_por_bar and len(cantidades_bar) > 0:
+            for prod_id, cant in cantidades_bar.items():
+                cursor.execute("""
+                    INSERT INTO solicitudes (producto_id, cantidad, solicitado_por)
+                    VALUES (?, ?, ?)
+                """, (prod_id, str(cant), solicitado_por_bar))
+            conn.commit()
+            st.success("✅ Todas las solicitudes desde bar fueron registradas correctamente.")
+            st.rerun()
+        else:
+            st.warning("⚠️ Asegúrese de escribir su nombre y marcar al menos un producto con cantidad.")
+
+    st.divider()
+    st.markdown("### Solicitudes recientes del bar")
+
+    solicitudes_bar = pd.read_sql_query("""
+        SELECT s.id, p.nombre, p.marca, s.cantidad, s.estado, s.fecha, s.solicitado_por
+        FROM solicitudes s
+        JOIN productos p ON s.producto_id = p.id
+        WHERE p.origen = 'bar'
+        ORDER BY s.fecha DESC
+    """, conn)
+
+    st.dataframe(solicitudes_bar, use_container_width=True)
 
 
