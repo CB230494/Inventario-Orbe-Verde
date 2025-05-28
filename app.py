@@ -64,7 +64,7 @@ with tabs[0]:
                     cantidades[row["id"]] = cantidad
 
     # Botón para enviar múltiples productos
-    if st.button("Enviar solicitud múltiple"):
+    if st.button("Enviar solicitud"):
         if solicitado_por and len(cantidades) > 0:
             for prod_id, cant in cantidades.items():
                 cursor.execute("""
@@ -116,7 +116,7 @@ with tabs[1]:
                 if cantidad > 0:
                     cantidades_bar[row["id"]] = cantidad
 
-    if st.button("Enviar solicitud múltiple desde bar"):
+    if st.button("Enviar solicitud"):
         if solicitado_por_bar and len(cantidades_bar) > 0:
             for prod_id, cant in cantidades_bar.items():
                 cursor.execute("""
@@ -141,5 +141,92 @@ with tabs[1]:
     """, conn)
 
     st.dataframe(solicitudes_bar, use_container_width=True)
+# ========== 👨‍💼 PESTAÑA ADMINISTRADOR ==========
+with tabs[2]:
+    st.subheader("Panel de control del administrador")
+
+    # ----- COCINA -----
+    st.markdown("### 🧑‍🍳 Solicitudes desde cocina")
+
+    solicitudes_cocina = pd.read_sql_query("""
+        SELECT s.id, p.nombre, s.cantidad, s.estado, s.fecha, s.solicitado_por
+        FROM solicitudes s
+        JOIN productos p ON s.producto_id = p.id
+        WHERE p.origen = 'cocina'
+        ORDER BY s.fecha DESC
+    """, conn)
+
+    for index, row in solicitudes_cocina.iterrows():
+        col1, col2, col3, col4, col5 = st.columns([3, 2, 2, 1, 1])
+        with col1:
+            st.text(f"{row['nombre']} - {row['cantidad']}")
+        with col2:
+            st.text(f"Solicitado por: {row['solicitado_por']}")
+        with col3:
+            st.text(f"Estado: {row['estado']}")
+        with col4:
+            if st.button("✅", key=f"mark_cocina_{row['id']}"):
+                cursor.execute("UPDATE solicitudes SET estado = 'comprado' WHERE id = ?", (row['id'],))
+                conn.commit()
+                st.rerun()
+        with col5:
+            if st.button("🗑️", key=f"delete_cocina_{row['id']}"):
+                cursor.execute("DELETE FROM solicitudes WHERE id = ?", (row['id'],))
+                conn.commit()
+                st.rerun()
+
+    if st.button("🧹 Limpiar solicitudes compradas (cocina)"):
+        cursor.execute("""
+            DELETE FROM solicitudes
+            WHERE estado = 'comprado' AND producto_id IN (
+                SELECT id FROM productos WHERE origen = 'cocina'
+            )
+        """)
+        conn.commit()
+        st.success("🧼 Solicitudes de cocina eliminadas.")
+        st.rerun()
+
+    st.divider()
+
+    # ----- BAR -----
+    st.markdown("### 🍻 Solicitudes desde bar")
+
+    solicitudes_bar = pd.read_sql_query("""
+        SELECT s.id, p.nombre, p.marca, s.cantidad, s.estado, s.fecha, s.solicitado_por
+        FROM solicitudes s
+        JOIN productos p ON s.producto_id = p.id
+        WHERE p.origen = 'bar'
+        ORDER BY s.fecha DESC
+    """, conn)
+
+    for index, row in solicitudes_bar.iterrows():
+        col1, col2, col3, col4, col5 = st.columns([3, 2, 2, 1, 1])
+        with col1:
+            st.text(f"{row['nombre']} ({row['marca']}) - {row['cantidad']}")
+        with col2:
+            st.text(f"Solicitado por: {row['solicitado_por']}")
+        with col3:
+            st.text(f"Estado: {row['estado']}")
+        with col4:
+            if st.button("✅", key=f"mark_bar_{row['id']}"):
+                cursor.execute("UPDATE solicitudes SET estado = 'comprado' WHERE id = ?", (row['id'],))
+                conn.commit()
+                st.rerun()
+        with col5:
+            if st.button("🗑️", key=f"delete_bar_{row['id']}"):
+                cursor.execute("DELETE FROM solicitudes WHERE id = ?", (row['id'],))
+                conn.commit()
+                st.rerun()
+
+    if st.button("🧹 Limpiar solicitudes compradas (bar)"):
+        cursor.execute("""
+            DELETE FROM solicitudes
+            WHERE estado = 'comprado' AND producto_id IN (
+                SELECT id FROM productos WHERE origen = 'bar'
+            )
+        """)
+        conn.commit()
+        st.success("🧼 Solicitudes del bar eliminadas.")
+        st.rerun()
 
 
