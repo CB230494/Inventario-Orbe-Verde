@@ -3,24 +3,29 @@ import sqlite3
 import pandas as pd
 from datetime import datetime
 
-# Configuración general
+# Configuración general de la app
 st.set_page_config(page_title="Inventario Orbe Verde", layout="wide")
+
+# Estilos personalizados (fondo oscuro, letras blancas)
 st.markdown(
     """
     <style>
     body { color: white; background-color: #121212; }
-    .stTextInput > div > div > input { color: white !important; }
-    .stNumberInput input { color: white !important; }
-    .stDataFrame div { color: white !important; }
+    .stTextInput > div > div > input,
+    .stNumberInput input,
+    .stDataFrame div {
+        color: white !important;
+    }
     </style>
-    """, unsafe_allow_html=True
+    """,
+    unsafe_allow_html=True
 )
 
-# Conexión base de datos
+# Conexión a la base de datos
 conn = sqlite3.connect("inventario_orbeverde.db")
 cursor = conn.cursor()
 
-# Crear tabla productos si no existe
+# Crear tabla de productos si no existe
 cursor.execute("""
 CREATE TABLE IF NOT EXISTS productos (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -34,7 +39,7 @@ CREATE TABLE IF NOT EXISTS productos (
 )
 """)
 
-# Crear tabla solicitudes
+# Crear tabla de solicitudes si no existe
 cursor.execute("""
 CREATE TABLE IF NOT EXISTS solicitudes (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -48,14 +53,14 @@ CREATE TABLE IF NOT EXISTS solicitudes (
 """)
 conn.commit()
 
-# Tabs
+# Crear pestañas
 tabs = st.tabs(["🍽 Cocina", "🍸 Bar", "🧾 Administrador"])
 
-# ========== 🧑‍🍳 PESTAÑA COCINA ==========
+# ========== 🍽 PESTAÑA COCINA ==========
 with tabs[0]:
     st.subheader("Solicitud de productos desde cocina")
 
-    # CORREGIR unidad del arroz a kilo (en ejecución directa para evitar errores)
+    # CORREGIR unidad del arroz a kilo (por si no se actualizó antes)
     cursor.execute("""
         UPDATE productos
         SET unidad = 'kilo'
@@ -63,7 +68,7 @@ with tabs[0]:
     """)
     conn.commit()
 
-    # Cargar productos
+    # Cargar productos de cocina
     productos_cocina = pd.read_sql_query("""
         SELECT id, nombre, categoria, subcategoria, unidad
         FROM productos
@@ -81,7 +86,10 @@ with tabs[0]:
             subcategorias = productos_cocina[productos_cocina["categoria"] == cat]["subcategoria"].unique()
             for sub in subcategorias:
                 st.markdown(f"**{sub}**")
-                sub_df = productos_cocina[(productos_cocina["categoria"] == cat) & (productos_cocina["subcategoria"] == sub)]
+                sub_df = productos_cocina[
+                    (productos_cocina["categoria"] == cat) &
+                    (productos_cocina["subcategoria"] == sub)
+                ]
                 for _, row in sub_df.iterrows():
                     label = f"{row['nombre']} ({row['unidad']})"
                     key = f"cocina_{row['id']}"
@@ -89,7 +97,7 @@ with tabs[0]:
                     if cantidad > 0:
                         cantidades[row["id"]] = cantidad
 
-    # Botón de envío
+    # Botón para enviar solicitud
     if st.button("Enviar solicitud", key="enviar_cocina"):
         if solicitado_por and len(cantidades) > 0:
             for prod_id, cant in cantidades.items():
@@ -121,11 +129,14 @@ with tabs[0]:
     )
 
     mostrar = solicitudes_cocina[["Producto solicitado", "estado", "fecha", "solicitado_por"]]
-    st.dataframe(mostrar.rename(columns={
-        "estado": "Estado",
-        "fecha": "Fecha",
-        "solicitado_por": "Solicitado por"
-    }), use_container_width=True)
+    st.dataframe(
+        mostrar.rename(columns={
+            "estado": "Estado",
+            "fecha": "Fecha",
+            "solicitado_por": "Solicitado por"
+        }),
+        use_container_width=True
+    )
 # ========== 🍸 PESTAÑA BAR ==========
 with tabs[1]:
     st.subheader("Solicitud de productos desde bar")
@@ -148,7 +159,10 @@ with tabs[1]:
             subcategorias = productos_bar[productos_bar["categoria"] == cat]["subcategoria"].unique()
             for sub in subcategorias:
                 st.markdown(f"**{sub}**")
-                sub_df = productos_bar[(productos_bar["categoria"] == cat) & (productos_bar["subcategoria"] == sub)]
+                sub_df = productos_bar[
+                    (productos_bar["categoria"] == cat) &
+                    (productos_bar["subcategoria"] == sub)
+                ]
                 for _, row in sub_df.iterrows():
                     label = f"{row['nombre']} ({row['marca']}) - {row['unidad']}"
                     key = f"bar_{row['id']}"
@@ -187,11 +201,14 @@ with tabs[1]:
     )
 
     mostrar_bar = solicitudes_bar[["Producto solicitado", "estado", "fecha", "solicitado_por"]]
-    st.dataframe(mostrar_bar.rename(columns={
-        "estado": "Estado",
-        "fecha": "Fecha",
-        "solicitado_por": "Solicitado por"
-    }), use_container_width=True)
+    st.dataframe(
+        mostrar_bar.rename(columns={
+            "estado": "Estado",
+            "fecha": "Fecha",
+            "solicitado_por": "Solicitado por"
+        }),
+        use_container_width=True
+    )
 # ========== 👨‍💼 PESTAÑA ADMINISTRADOR ==========
 with tabs[2]:
     st.subheader("Panel de control del administrador")
@@ -209,7 +226,7 @@ with tabs[2]:
     """, conn)
 
     for index, row in solicitudes_cocina.iterrows():
-        col1, col2, col3, col4, col5 = st.columns([3, 2, 2, 1, 1])
+        col1, col2, col3, col4, col5 = st.columns([3, 2, 2, 2, 2])
         with col1:
             estilo = "color: #90ee90;" if row["estado"] == "comprado" else ""
             st.markdown(f"<span style='{estilo}'>{row['cantidad']} {row['unidad']} de {row['nombre']}</span>", unsafe_allow_html=True)
@@ -255,7 +272,7 @@ with tabs[2]:
     """, conn)
 
     for index, row in solicitudes_bar.iterrows():
-        col1, col2, col3, col4, col5 = st.columns([3, 2, 2, 1, 1])
+        col1, col2, col3, col4, col5 = st.columns([3, 2, 2, 2, 2])
         with col1:
             estilo = "color: #90ee90;" if row["estado"] == "comprado" else ""
             st.markdown(f"<span style='{estilo}'>{row['cantidad']} {row['unidad']} de {row['nombre']} ({row['marca']})</span>", unsafe_allow_html=True)
