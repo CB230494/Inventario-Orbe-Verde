@@ -160,5 +160,98 @@ with tabs[0]:
         }),
         use_container_width=True
     )
+# ========== 🍸 PESTAÑA BAR ==========
+with tabs[1]:
+    st.subheader("Solicitud de productos desde bar")
+
+    # Cargar productos de bar
+    productos_bar = pd.read_sql_query("""
+        SELECT id, nombre, categoria, subcategoria, unidad, marca
+        FROM productos
+        WHERE origen = 'bar'
+        ORDER BY categoria, subcategoria, nombre
+    """, conn)
+
+    solicitado_por = st.text_input("Solicitado por", key="solicitado_bar")
+
+    categorias_bar = productos_bar["categoria"].dropna().unique()
+    cantidades_bar = {}
+
+    for cat in categorias_bar:
+        with st.expander(f"🍹 {cat}", expanded=False):
+
+            # Subcategorías válidas
+            subcategorias = productos_bar[
+                (productos_bar["categoria"] == cat) &
+                (productos_bar["subcategoria"].notnull()) &
+                (productos_bar["subcategoria"] != "")
+            ]["subcategoria"].unique()
+
+            for sub in subcategorias:
+                st.markdown(f"**{sub}**")
+                sub_df = productos_bar[
+                    (productos_bar["categoria"] == cat) &
+                    (productos_bar["subcategoria"] == sub)
+                ]
+                for _, row in sub_df.iterrows():
+                    label = f"{row['nombre']} ({row['marca']}) - {row['unidad']}"
+                    key = f"bar_{row['id']}"
+                    cantidad = st.number_input(label, min_value=0, step=1, key=key)
+                    if cantidad > 0:
+                        cantidades_bar[row["id"]] = cantidad
+
+            # Mostrar productos sin subcategoría
+            otros = productos_bar[
+                (productos_bar["categoria"] == cat) &
+                ((productos_bar["subcategoria"].isnull()) | (productos_bar["subcategoria"] == ""))
+            ]
+            if not otros.empty:
+                st.markdown("**Otros**")
+                for _, row in otros.iterrows():
+                    label = f"{row['nombre']} ({row['marca']}) - {row['unidad']}"
+                    key = f"bar_{row['id']}"
+                    cantidad = st.number_input(label, min_value=0, step=1, key=key)
+                    if cantidad > 0:
+                        cantidades_bar[row["id"]] = cantidad
+
+    # Botón de envío
+    if st.button("Enviar solicitud", key="enviar_bar"):
+        if solicitado_por and len(cantidades_bar) > 0:
+            for prod_id, cant in cantidades_bar.items():
+                cursor.execute("""
+                    INSERT INTO solicitudes (producto_id, cantidad, solicitado_por)
+                    VALUES (?, ?, ?)
+                """, (prod_id, str(cant), solicitado_por))
+            conn.commit()
+            st.success("✅ Todas las solicitudes del bar fueron registradas correctamente.")
+            st.rerun()
+        else:
+            st.warning("⚠️ Asegúrese de escribir su nombre y marcar al menos un producto con cantidad.")
+
+    st.divider()
+    st.markdown("### Solicitudes recientes del bar")
+
+    solicitudes_bar = pd.read_sql_query("""
+        SELECT s.id, s.producto_id, s.cantidad, s.estado, s.fecha, s.solicitado_por,
+               p.nombre, p.unidad, p.marca
+        FROM solicitudes s
+        JOIN productos p ON s.producto_id = p.id
+        WHERE p.origen = 'bar'
+        ORDER BY s.fecha DESC
+    """, conn)
+
+    solicitudes_bar["Producto solicitado"] = solicitudes_bar.apply(
+        lambda row: f"{row['cantidad']} {row['unidad']} de {row['nombre']} ({row['marca']})", axis=1
+    )
+
+    mostrar_bar = solicitudes_bar[["Producto solicitado", "estado", "fecha", "solicitado_por"]]
+    st.dataframe(
+        mostrar_bar.rename(columns={
+            "estado": "Estado",
+            "fecha": "Fecha",
+            "solicitado_por": "Solicitado por"
+        }),
+        use_container_width=True
+    )
 
 
