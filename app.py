@@ -211,24 +211,25 @@ with tabs[2]:
     for index, row in solicitudes_cocina.iterrows():
         col1, col2, col3, col4, col5 = st.columns([3, 2, 2, 1, 1])
         with col1:
-            st.text(f"{row['cantidad']} {row['unidad']} de {row['nombre']}")
+            estilo = "color: #90ee90;" if row["estado"] == "comprado" else ""
+            st.markdown(f"<span style='{estilo}'>{row['cantidad']} {row['unidad']} de {row['nombre']}</span>", unsafe_allow_html=True)
         with col2:
             st.text(f"Solicitado por: {row['solicitado_por']}")
         with col3:
             st.text(f"Estado: {row['estado']}")
         with col4:
-            if st.button("✅", key=f"mark_cocina_{row['id']}"):
+            if st.button("✅ Marcar/Desmarcar", key=f"mark_cocina_{row['id']}"):
                 nuevo_estado = "pendiente" if row["estado"] == "comprado" else "comprado"
                 cursor.execute("UPDATE solicitudes SET estado = ? WHERE id = ?", (nuevo_estado, row['id']))
                 conn.commit()
                 st.rerun()
         with col5:
-            if st.button("🗑️", key=f"delete_cocina_{row['id']}"):
+            if st.button("🗑️ Eliminar", key=f"delete_cocina_{row['id']}"):
                 cursor.execute("DELETE FROM solicitudes WHERE id = ?", (row['id'],))
                 conn.commit()
                 st.rerun()
 
-    if st.button("Enviar solicitud", key="limpiar_cocina"):
+    if st.button("Actualizar", key="limpiar_cocina"):
         cursor.execute("""
             DELETE FROM solicitudes
             WHERE estado = 'comprado' AND producto_id IN (
@@ -256,24 +257,25 @@ with tabs[2]:
     for index, row in solicitudes_bar.iterrows():
         col1, col2, col3, col4, col5 = st.columns([3, 2, 2, 1, 1])
         with col1:
-            st.text(f"{row['cantidad']} {row['unidad']} de {row['nombre']} ({row['marca']})")
+            estilo = "color: #90ee90;" if row["estado"] == "comprado" else ""
+            st.markdown(f"<span style='{estilo}'>{row['cantidad']} {row['unidad']} de {row['nombre']} ({row['marca']})</span>", unsafe_allow_html=True)
         with col2:
             st.text(f"Solicitado por: {row['solicitado_por']}")
         with col3:
             st.text(f"Estado: {row['estado']}")
         with col4:
-            if st.button("✅", key=f"mark_bar_{row['id']}"):
+            if st.button("✅ Marcar/Desmarcar", key=f"mark_bar_{row['id']}"):
                 nuevo_estado = "pendiente" if row["estado"] == "comprado" else "comprado"
                 cursor.execute("UPDATE solicitudes SET estado = ? WHERE id = ?", (nuevo_estado, row['id']))
                 conn.commit()
                 st.rerun()
         with col5:
-            if st.button("🗑️", key=f"delete_bar_{row['id']}"):
+            if st.button("🗑️ Eliminar", key=f"delete_bar_{row['id']}"):
                 cursor.execute("DELETE FROM solicitudes WHERE id = ?", (row['id'],))
                 conn.commit()
                 st.rerun()
 
-    if st.button("Enviar solicitud", key="limpiar_bar"):
+    if st.button("Actualizar", key="limpiar_bar"):
         cursor.execute("""
             DELETE FROM solicitudes
             WHERE estado = 'comprado' AND producto_id IN (
