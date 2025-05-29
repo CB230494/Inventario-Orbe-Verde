@@ -253,5 +253,98 @@ with tabs[1]:
         }),
         use_container_width=True
     )
+# ========== 👨‍💼 PESTAÑA ADMINISTRADOR ==========
+with tabs[2]:
+    st.subheader("Panel de control del administrador")
+
+    # ----- COCINA -----
+    st.markdown("### 🧑‍🍳 Solicitudes desde cocina")
+
+    solicitudes_cocina = pd.read_sql_query("""
+        SELECT s.id, s.producto_id, s.cantidad, s.estado, s.fecha, s.solicitado_por,
+               p.nombre, p.unidad
+        FROM solicitudes s
+        JOIN productos p ON s.producto_id = p.id
+        WHERE p.origen = 'cocina'
+        ORDER BY s.fecha DESC
+    """, conn)
+
+    for index, row in solicitudes_cocina.iterrows():
+        col1, col2, col3, col4, col5 = st.columns([3, 2, 2, 2, 2])
+        with col1:
+            estilo = "color: #90ee90;" if row["estado"] == "comprado" else ""
+            st.markdown(f"<span style='{estilo}'>{row['cantidad']} {row['unidad']} de {row['nombre']}</span>", unsafe_allow_html=True)
+        with col2:
+            st.text(f"Solicitado por: {row['solicitado_por']}")
+        with col3:
+            st.text(f"Estado: {row['estado']}")
+        with col4:
+            if st.button("✅ Marcar/Desmarcar", key=f"mark_cocina_{row['id']}"):
+                nuevo_estado = "pendiente" if row["estado"] == "comprado" else "comprado"
+                cursor.execute("UPDATE solicitudes SET estado = ? WHERE id = ?", (nuevo_estado, row['id']))
+                conn.commit()
+                st.rerun()
+        with col5:
+            if st.button("🗑️ Eliminar", key=f"delete_cocina_{row['id']}"):
+                cursor.execute("DELETE FROM solicitudes WHERE id = ?", (row['id'],))
+                conn.commit()
+                st.rerun()
+
+    if st.button("Actualizar", key="limpiar_cocina"):
+        cursor.execute("""
+            DELETE FROM solicitudes
+            WHERE estado = 'comprado' AND producto_id IN (
+                SELECT id FROM productos WHERE origen = 'cocina'
+            )
+        """)
+        conn.commit()
+        st.success("🧼 Solicitudes compradas de cocina eliminadas.")
+        st.rerun()
+
+    st.divider()
+
+    # ----- BAR -----
+    st.markdown("### 🍻 Solicitudes desde bar")
+
+    solicitudes_bar = pd.read_sql_query("""
+        SELECT s.id, s.producto_id, s.cantidad, s.estado, s.fecha, s.solicitado_por,
+               p.nombre, p.unidad, p.marca
+        FROM solicitudes s
+        JOIN productos p ON s.producto_id = p.id
+        WHERE p.origen = 'bar'
+        ORDER BY s.fecha DESC
+    """, conn)
+
+    for index, row in solicitudes_bar.iterrows():
+        col1, col2, col3, col4, col5 = st.columns([3, 2, 2, 2, 2])
+        with col1:
+            estilo = "color: #90ee90;" if row["estado"] == "comprado" else ""
+            st.markdown(f"<span style='{estilo}'>{row['cantidad']} {row['unidad']} de {row['nombre']} ({row['marca']})</span>", unsafe_allow_html=True)
+        with col2:
+            st.text(f"Solicitado por: {row['solicitado_por']}")
+        with col3:
+            st.text(f"Estado: {row['estado']}")
+        with col4:
+            if st.button("✅ Marcar/Desmarcar", key=f"mark_bar_{row['id']}"):
+                nuevo_estado = "pendiente" if row["estado"] == "comprado" else "comprado"
+                cursor.execute("UPDATE solicitudes SET estado = ? WHERE id = ?", (nuevo_estado, row['id']))
+                conn.commit()
+                st.rerun()
+        with col5:
+            if st.button("🗑️ Eliminar", key=f"delete_bar_{row['id']}"):
+                cursor.execute("DELETE FROM solicitudes WHERE id = ?", (row['id'],))
+                conn.commit()
+                st.rerun()
+
+    if st.button("Actualizar", key="limpiar_bar"):
+        cursor.execute("""
+            DELETE FROM solicitudes
+            WHERE estado = 'comprado' AND producto_id IN (
+                SELECT id FROM productos WHERE origen = 'bar'
+            )
+        """)
+        conn.commit()
+        st.success("🧼 Solicitudes compradas del bar eliminadas.")
+        st.rerun()
 
 
