@@ -5,6 +5,11 @@ from datetime import datetime
 
 # Configuración general
 st.set_page_config(page_title="Inventario Orbe Verde", layout="wide")
+
+# Título principal
+st.title("🍃 Sistema de Inventario - Restaurante Orbe Verde")
+
+# Estilos personalizados (fondo oscuro, letras blancas)
 st.markdown(
     """
     <style>
@@ -57,7 +62,7 @@ tabs = st.tabs(["🍽 Cocina", "🍸 Bar", "🧾 Administrador"])
 with tabs[0]:
     st.subheader("Solicitud de productos desde cocina")
 
-    # Corregir unidad del arroz a kilo
+    # Corregir unidad del arroz a kilo (por si no se había corregido)
     cursor.execute("""
         UPDATE productos
         SET unidad = 'kilo'
@@ -65,7 +70,7 @@ with tabs[0]:
     """)
     conn.commit()
 
-    # Cargar productos
+    # Cargar productos de cocina
     productos_cocina = pd.read_sql_query("""
         SELECT id, nombre, categoria, subcategoria, unidad
         FROM productos
@@ -81,7 +86,7 @@ with tabs[0]:
     for cat in categorias:
         with st.expander(f"🍽 {cat}", expanded=False):
 
-            # Subcategorías válidas (evitar None o "")
+            # Subcategorías válidas
             subcategorias = productos_cocina[
                 (productos_cocina["categoria"] == cat) &
                 (productos_cocina["subcategoria"].notnull()) &
@@ -133,7 +138,6 @@ with tabs[0]:
     st.divider()
     st.markdown("### Solicitudes recientes de cocina")
 
-    # Mostrar solicitudes registradas
     solicitudes_cocina = pd.read_sql_query("""
         SELECT s.id, s.producto_id, s.cantidad, s.estado, s.fecha, s.solicitado_por,
                p.nombre, p.unidad
@@ -148,12 +152,13 @@ with tabs[0]:
     )
 
     mostrar = solicitudes_cocina[["Producto solicitado", "estado", "fecha", "solicitado_por"]]
-    st.dataframe(mostrar.rename(columns={
-        "estado": "Estado",
-        "fecha": "Fecha",
-        "solicitado_por": "Solicitado por"
-    }), use_container_width=True)
-
-
+    st.dataframe(
+        mostrar.rename(columns={
+            "estado": "Estado",
+            "fecha": "Fecha",
+            "solicitado_por": "Solicitado por"
+        }),
+        use_container_width=True
+    )
 
 
